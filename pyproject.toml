@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inventree-location-image"
+dynamic = ["version"]
+description = "InvenTree plugin: upload and display an image for each stock location"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "glompos21" }]
+keywords = ["inventree", "plugin", "stock", "location", "image"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Framework :: Django",
+    "Framework :: InvenTree",
+]
+# No runtime dependencies: Django, DRF and django-stdimage are provided by InvenTree
+dependencies = []
+
+[project.urls]
+"Upstream issue" = "https://github.com/inventree/InvenTree/issues/9843"
+
+[project.entry-points."inventree_plugins"]
+LocationImagePlugin = "inventree_location_image.core:LocationImagePlugin"
+
+[tool.setuptools.dynamic]
+version = { attr = "inventree_location_image.PLUGIN_VERSION" }
+
+[tool.setuptools.packages.find]
+include = ["inventree_location_image*"]
+
+[tool.setuptools.package-data]
+inventree_location_image = ["static/*"]
+
+# Mirrors the InvenTree ruff configuration
+[tool.ruff]
+exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["A", "B", "C", "C4", "D", "F", "I", "N", "SIM", "PIE", "PLE", "PLW", "RUF", "UP", "W"]
+ignore = ["RUF012", "SIM105"]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["D104"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+combine-as-imports = false
+section-order = ["future", "standard-library", "django", "third-party", "first-party", "local-folder"]
+# InvenTree core apps, which plugins import from
+known-first-party = ["InvenTree", "common", "plugin", "stock", "users"]
+
+[tool.ruff.lint.isort.sections]
+"django" = ["django"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = true
