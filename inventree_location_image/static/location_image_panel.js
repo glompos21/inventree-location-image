@@ -1,10 +1,12 @@
 /**
  * Stock location image panel for the InvenTree "LocationImage" plugin.
  *
- * Loaded by the InvenTree frontend as a plugin panel on the stock location
- * detail page. Plain JavaScript, so no build step is needed.
+ * Loaded by the InvenTree frontend on the stock location detail page:
+ *   renderLocationImagePanel  the "Image" panel
+ *   openLocationImageDialog   the "Image" button in the page header
+ * Plain JavaScript, so no build step is needed.
  *
- * Server context (from LocationImagePlugin.get_ui_panels):
+ * Server context (from LocationImagePlugin.location_context):
  *   api_url      API endpoint for this location's image
  *   can_edit     True if the user may upload / remove the image
  *   max_size_mb  Maximum upload size in MB
@@ -333,4 +335,174 @@ export function renderLocationImagePanel(target, data) {
       }
     })
     .finally(render);
+}
+
+const DIALOG_ID = 'location-image-dialog';
+
+/** Visible elements inside a container that can take keyboard focus. */
+function focusableElements(container) {
+  return [
+    ...container.querySelectorAll('a[href], button:not([disabled]), input:not([disabled])')
+  ].filter((node) => node.getClientRects().length > 0);
+}
+
+/**
+ * Show the location image in a dialog.
+ *
+ * Called by the InvenTree frontend when the "Image" button in the stock
+ * location page header is clicked (a "primary_action" UI feature, from
+ * LocationImagePlugin.get_ui_primary_actions). The dialog holds the same
+ * view as the Image panel, so it can also upload, replace and remove.
+ */
+export function openLocationImageDialog({
+  featureContext,
+  inventreeContext,
+  serverContext
+} = {}) {
+  // Already open (e.g. after a double click)
+  if (document.getElementById(DIALOG_ID)) return;
+
+  const ctx = serverContext ?? featureContext ?? {};
+  const previousFocus = document.activeElement;
+  const titleId = `${DIALOG_ID}-title`;
+
+  const closeButton = el(
+    'button',
+    {
+      type: 'button',
+      'aria-label': 'Close',
+      title: 'Close',
+      style: {
+        font: 'inherit',
+        fontSize: '20px',
+        lineHeight: 1,
+        padding: '4px 8px',
+        background: 'transparent',
+        color: 'inherit',
+        border: 'none',
+        borderRadius: 'var(--mantine-radius-sm, 4px)',
+        cursor: 'pointer'
+      }
+    },
+    '×'
+  );
+
+  const body = el('div');
+
+  const dialog = el(
+    'div',
+    {
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-labelledby': titleId,
+      style: {
+        width: 'min(720px, 100%)',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        boxSizing: 'border-box',
+        padding: '16px',
+        background: 'var(--mantine-color-body, #fff)',
+        color: 'var(--mantine-color-text, #000)',
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 'var(--mantine-radius-md, 8px)',
+        boxShadow: 'var(--mantine-shadow-xl, 0 8px 32px rgba(0, 0, 0, 0.3))'
+      }
+    },
+    [
+      el(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '12px'
+          }
+        },
+        [
+          el(
+            'h2',
+            { id: titleId, style: { margin: 0, fontSize: '18px' } },
+            'Location image'
+          ),
+          closeButton
+        ]
+      ),
+      body
+    ]
+  );
+
+  const overlay = el(
+    'div',
+    {
+      id: DIALOG_ID,
+      style: {
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        boxSizing: 'border-box',
+        background: 'rgba(0, 0, 0, 0.6)'
+      }
+    },
+    dialog
+  );
+
+  function close() {
+    document.removeEventListener('keydown', onKeyDown, true);
+    overlay.remove();
+    previousFocus?.focus?.();
+  }
+
+  function onKeyDown(event) {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      close();
+    } else if (event.key === 'Tab') {
+      // Keep keyboard focus inside the dialog
+      const focusable = focusableElements(dialog);
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  closeButton.addEventListener('click', close);
+
+  // Close on a click on the backdrop, but not when a drag (e.g. selecting
+  // text) starts inside the dialog and ends outside it
+  overlay.addEventListener('mousedown', (event) => {
+    overlay.dataset.pressedOnBackdrop = String(event.target === overlay);
+  });
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay && overlay.dataset.pressedOnBackdrop === 'true') {
+      close();
+    }
+  });
+
+  document.addEventListener('keydown', onKeyDown, true);
+  document.body.append(overlay);
+  closeButton.focus();
+
+  renderLocationImagePanel(body, {
+    context: ctx,
+    api: inventreeContext?.api,
+    host: inventreeContext?.host
+  });
 }

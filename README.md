@@ -7,6 +7,7 @@ It is a workaround for [InvenTree issue #9843](https://github.com/inventree/Inve
 ## Features
 
 - An **Image** panel on every stock location detail page. It shows the current image, which opens full size in a new tab.
+- An **Image** button in the page header of every stock location. It opens the same view in a dialog, so you can see the image without leaving *Location Details* or any other panel. Needs InvenTree 1.4 or newer.
 - Upload, replace and remove buttons for users with the `stock_location` **change** role.
 - Users with the **view** role see the image only.
 - A thumbnail (128 px) and a preview (256 px) are generated for each image.
@@ -17,7 +18,7 @@ It is a workaround for [InvenTree issue #9843](https://github.com/inventree/Inve
 
 ## Requirements
 
-- InvenTree 1.0 or newer (`MIN_VERSION`). So far it has only been tested on 1.8 (development).
+- InvenTree 1.0 or newer (`MIN_VERSION`). The header button needs InvenTree 1.4 or newer; older versions show only the panel. So far it has only been tested on 1.8 (development).
 - No extra Python packages. The plugin uses Django, Django REST Framework and django-stdimage, which InvenTree already provides.
 
 ## Installation
@@ -25,17 +26,24 @@ It is a workaround for [InvenTree issue #9843](https://github.com/inventree/Inve
 1. Install the package into the InvenTree Python environment:
 
    ```bash
-   pip install git+https://<your-git-host>/inventree-location-image.git
+   pip install git+https://github.com/glompos21/inventree-location-image.git
    # or, for development
    pip install -e /path/to/inventree-location-image
    ```
 
-   You can also add it in the InvenTree admin center under *Plugins → Install plugin*.
+   You can also install it from the web interface under *Admin Center → Plugins → Install Plugin*. Fill in both fields:
+
+   | Field | Value |
+   |---|---|
+   | Package Name | `inventree-location-image` |
+   | Source URL | `git+https://github.com/glompos21/inventree-location-image.git` |
+
+   The Source URL needs the `git+` prefix. Without it, InvenTree treats the URL as a package index and the install fails, for example with `You must give at least one requirement to install`. Fill in the Package Name too: InvenTree uses it to add the plugin to `plugins.txt`, so the plugin is reinstalled when the server is rebuilt (for example, a Docker image update).
 
 2. In **Admin Center → Plugin Settings**, enable all three of these:
    - **Enable URL integration**, for the plugin's API endpoint
    - **Enable app integration**, for the plugin's database table
-   - **Enable interface integration**, for the panel
+   - **Enable interface integration**, for the panel and the header button
 
 3. Activate the **LocationImage** plugin in **Admin Center → Plugins**.
 
@@ -48,7 +56,7 @@ It is a workaround for [InvenTree issue #9843](https://github.com/inventree/Inve
 
    In Docker, run `docker compose run --rm inventree-server invoke update` instead.
 
-5. Open any stock location. A new **Image** panel appears in its sidebar.
+5. Open any stock location. A new **Image** panel appears in its sidebar, and an **Image** button in its page header.
 
 If a setting from step 2 is missing, the panel tells you which one.
 
@@ -107,7 +115,7 @@ To remove the plugin and all of its images:
 
 Because this is a plugin and not a core change:
 
-- The image appears in its own panel, not in the stock location's main details view.
+- The image appears in its own panel and in a dialog opened from the page header, not inside the stock location's *Location Details* panel. Plugins cannot add fields to core detail panels.
 - It is not shown in the location table or tree, or in search results.
 - It is not part of the core `/api/stock/location/` serializer, and report templates can't access it directly.
 - Images are not included in InvenTree's data export or import. They are included in database and media backups.

@@ -409,3 +409,57 @@ class LocationImagePanelTest(ActivePluginMixin, InvenTreeAPITestCase):
         self.assertEqual(
             self.panels(target_model='stocklocation', target_id=self.location.pk), []
         )
+
+    def actions(self, **context):
+        """Return the page header buttons for the given context."""
+        return self.plugin.get_ui_primary_actions(self.request, context)
+
+    def test_primary_action(self):
+        """An "Image" button is shown in the stock location page header."""
+        actions = self.actions(target_model='stocklocation', target_id=self.location.pk)
+
+        self.assertEqual(len(actions), 1)
+        action = actions[0]
+
+        self.assertEqual(action['key'], 'location-image-action')
+        self.assertEqual(action['title'], 'Image')
+        self.assertTrue(
+            action['source'].endswith('location_image_panel.js:openLocationImageDialog')
+        )
+
+        # Same context as the panel
+        panel = self.panels(target_model='stocklocation', target_id=self.location.pk)[0]
+        self.assertEqual(action['context'], panel['context'])
+
+    def test_primary_action_hidden(self):
+        """The button is not shown on other pages, or without view access."""
+        self.assertEqual(self.actions(target_model='part', target_id=1), [])
+        self.assertEqual(self.actions(target_model='stocklocation'), [])
+        self.assertEqual(self.actions(), [])
+
+        self.clearRoles()
+        self.assertEqual(
+            self.actions(target_model='stocklocation', target_id=self.location.pk), []
+        )
+
+    def test_primary_action_api(self):
+        """The button is served by the InvenTree UI feature API.
+
+        The frontend sends the page context as query parameters, so the
+        location id arrives as a string.
+        """
+        from common.models import InvenTreeSetting
+
+        InvenTreeSetting.set_setting('ENABLE_PLUGINS_INTERFACE', True, change_user=None)
+
+        url = reverse(
+            'api-plugin-ui-feature-list', kwargs={'feature': 'primary_action'}
+        )
+        response = self.get(
+            url, {'target_model': 'stocklocation', 'target_id': str(self.location.pk)}
+        )
+
+        actions = [a for a in response.data if a['plugin_name'] == 'locationimage']
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0]['key'], 'location-image-action')
+        self.assertIn('api_url', actions[0]['context'])

@@ -5,7 +5,8 @@ changing the core StockLocation model:
 
 - AppMixin: stores images in the plugin's own LocationImage table
 - UrlsMixin: API endpoint at /plugin/locationimage/location/<pk>/
-- UserInterfaceMixin: an "Image" panel on the stock location detail page
+- UserInterfaceMixin: an "Image" panel and an "Image" header button on the
+  stock location detail page
 """
 
 from django.apps import apps
@@ -70,25 +71,29 @@ class LocationImagePlugin(
 
         return max(size_mb, 1) * 1024 * 1024
 
-    def get_ui_panels(self, request, context, **kwargs):
-        """Add an image panel to the stock location detail page."""
+    def location_context(self, request, context):
+        """Build the frontend context for a stock location detail page.
+
+        Returns None when the page is not a single stock location, or the
+        user may not view stock locations.
+        """
         context = context or {}
 
         if context.get('target_model') != 'stocklocation':
-            return []
+            return None
 
         try:
             location_id = int(context.get('target_id'))
         except (TypeError, ValueError):
             # Location index page (no specific location)
-            return []
+            return None
 
         user = request.user
 
         if not check_user_role(user, 'stock_location', 'view'):
-            return []
+            return None
 
-        panel_context = {
+        location_context = {
             'api_url': None,
             'can_edit': check_user_role(user, 'stock_location', 'change'),
             'max_size_mb': self.max_image_size() // (1024 * 1024),
@@ -96,20 +101,29 @@ class LocationImagePlugin(
         }
 
         if not apps.is_installed(APP_NAME):
-            panel_context['error'] = (
+            location_context['error'] = (
                 'App integration is disabled. Enable "App integration" in the '
                 'plugin settings, restart the server and run database migrations.'
             )
         else:
             try:
-                panel_context['api_url'] = reverse(
+                location_context['api_url'] = reverse(
                     f'plugin:{self.SLUG}:location-image', kwargs={'pk': location_id}
                 )
             except NoReverseMatch:
-                panel_context['error'] = (
+                location_context['error'] = (
                     'URL integration is disabled. Enable "URL integration" in the '
                     'plugin settings and restart the server.'
                 )
+
+        return location_context
+
+    def get_ui_panels(self, request, context, **kwargs):
+        """Add an image panel to the stock location detail page."""
+        location_context = self.location_context(request, context)
+
+        if location_context is None:
+            return []
 
         return [
             {
@@ -120,6 +134,31 @@ class LocationImagePlugin(
                 'source': self.plugin_static_file(
                     'location_image_panel.js:renderLocationImagePanel'
                 ),
-                'context': panel_context,
+                'context': location_context,
+            }
+        ]
+
+    def get_ui_primary_actions(self, request, context, **kwargs):
+        """Add an "Image" button to the stock location page header.
+
+        The button opens the image in a dialog, so it can be seen from any
+        panel, including Location Details. Needs InvenTree 1.4 or newer;
+        older versions never call this method.
+        """
+        location_context = self.location_context(request, context)
+
+        if location_context is None:
+            return []
+
+        return [
+            {
+                'key': 'location-image-action',
+                'title': 'Image',
+                'description': 'Show the image of this stock location',
+                'icon': 'ti:photo:outline',
+                'source': self.plugin_static_file(
+                    'location_image_panel.js:openLocationImageDialog'
+                ),
+                'context': location_context,
             }
         ]
